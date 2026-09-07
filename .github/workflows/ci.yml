@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      run_translation_integration:
+        description: Run live translation provider integration tests
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -35,10 +40,18 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
-            -skip-testing:XKeyTests/TranslationProviderTests/testVolcanoEngine_EnglishToChinese \
-            -skip-testing:XKeyTests/TranslationProviderTests/testVolcanoEngine_EnglishToVietnamese \
-            | tail -100
-        # Pre-existing network-dependent failures (Volcano external service) — quarantined 2026-08-25
+            -skip-testing:XKeyTests/TranslationProviderIntegrationTests \
+            -resultBundlePath unit-tests.xcresult \
+            2>&1 | tee unit-tests.log
+      - name: Upload unit test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-diagnostics
+          path: |
+            unit-tests.log
+            unit-tests.xcresult
+          if-no-files-found: ignore
       - name: Perf gate (Release, retry 3 — noisy CI runners need multiple tries)
         run: |
           for i in 1 2 3; do
@@ -52,3 +65,31 @@ jobs:
         # ENABLE_TESTABILITY=YES is required here: the project's Release build
         # configuration doesn't set it (only Debug does), so `@testable import XKey`
         # fails to resolve against a plain Release build — verified locally 2026-08-25.
+
+  translation-integration:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_translation_integration
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run live translation provider tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project XKey.xcodeproj \
+            -scheme XKeyTests \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            -only-testing:XKeyTests/TranslationProviderIntegrationTests \
+            -resultBundlePath translation-integration.xcresult \
+            2>&1 | tee translation-integration.log
+      - name: Upload translation integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: translation-integration-diagnostics
+          path: |
+            translation-integration.log
+            translation-integration.xcresult
+          if-no-files-found: ignore

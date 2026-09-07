@@ -2,14 +2,13 @@
 //  TranslationProviderTests.swift
 //  XKeyTests
 //
-//  Unit tests for Translation Providers
-//  These tests make real network calls to verify providers work correctly
+//  Offline unit tests and live integration tests for Translation Providers
 //
 
 import XCTest
 @testable import XKey
 
-final class TranslationProviderTests: XCTestCase {
+final class TranslationProviderIntegrationTests: XCTestCase {
     
     // MARK: - Test Configuration
     
@@ -54,20 +53,6 @@ final class TranslationProviderTests: XCTestCase {
         XCTAssertNotNil(result.sourceLanguage, "Should detect source language")
         
         print("✅ Google Translate (auto-detect): '\(vietnameseText)' → '\(result.translatedText)' (detected: \(result.sourceLanguage ?? "unknown"))")
-    }
-    
-    func testGoogleTranslate_EmptyText() async {
-        let provider = GoogleTranslateProvider()
-        
-        do {
-            _ = try await provider.translate(text: "", from: "en", to: "vi")
-            XCTFail("Should throw error for empty text")
-        } catch let error as TranslationError {
-            XCTAssertEqual(error, TranslationError.emptyText)
-            print("✅ Google Translate correctly rejects empty text")
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
-        }
     }
     
     // MARK: - Tencent TranSmart Tests
@@ -155,22 +140,6 @@ final class TranslationProviderTests: XCTestCase {
         print("✅ TranslationService: '\(shortText)' → '\(result.translatedText)' (via \(result.providerName))")
     }
     
-    func testTranslationService_AllProvidersRegistered() {
-        let service = TranslationService.shared
-        
-        // Check that all providers are registered
-        let providers = service.sortedProviders
-        
-        XCTAssertGreaterThanOrEqual(providers.count, 3, "Should have at least 3 providers")
-        
-        let providerNames = providers.map { $0.name }
-        XCTAssertTrue(providerNames.contains("Google Translate"), "Should include Google Translate")
-        XCTAssertTrue(providerNames.contains("Tencent TranSmart"), "Should include Tencent TranSmart")
-        XCTAssertTrue(providerNames.contains("Volcano Engine"), "Should include Volcano Engine")
-        
-        print("✅ All 3 providers registered: \(providerNames.joined(separator: ", "))")
-    }
-    
     // MARK: - Comparison Tests
     
     func testAllProviders_CompareResults() async {
@@ -223,6 +192,38 @@ final class TranslationProviderTests: XCTestCase {
         
         print("⏱️ Google Translate response time: \(String(format: "%.2f", elapsed))s")
         XCTAssertLessThan(elapsed, networkTimeout, "Should complete within timeout")
+    }
+}
+
+final class TranslationProviderTests: XCTestCase {
+    func testGoogleTranslate_EmptyText() async {
+        let provider = GoogleTranslateProvider()
+
+        do {
+            _ = try await provider.translate(text: "", from: "en", to: "vi")
+            XCTFail("Should throw error for empty text")
+        } catch let error as TranslationError {
+            XCTAssertEqual(error, TranslationError.emptyText)
+            print("✅ Google Translate correctly rejects empty text")
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testTranslationService_AllProvidersRegistered() {
+        let service = TranslationService.shared
+
+        // Check that all providers are registered
+        let providers = service.sortedProviders
+
+        XCTAssertGreaterThanOrEqual(providers.count, 3, "Should have at least 3 providers")
+
+        let providerNames = providers.map { $0.name }
+        XCTAssertTrue(providerNames.contains("Google Translate"), "Should include Google Translate")
+        XCTAssertTrue(providerNames.contains("Tencent TranSmart"), "Should include Tencent TranSmart")
+        XCTAssertTrue(providerNames.contains("Volcano Engine"), "Should include Volcano Engine")
+
+        print("✅ All 3 providers registered: \(providerNames.joined(separator: ", "))")
     }
 }
 
